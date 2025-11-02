@@ -3,21 +3,6 @@ using SecureLanChat.Interfaces;
 
 namespace SecureLanChat.Services
 {
-    public interface ILoggingService
-    {
-        void LogUserAction(string userId, string action, string details = null);
-        void LogMessageSent(string senderId, string receiverId, bool isBroadcast, string messageType = "text");
-        void LogMessageReceived(string receiverId, string senderId, bool isBroadcast);
-        void LogUserConnection(string userId, string connectionId, bool isConnected);
-        void LogEncryptionEvent(string userId, string eventType, bool success, string details = null);
-        void LogDatabaseOperation(string operation, string table, bool success, TimeSpan duration);
-        void LogSecurityEvent(string eventType, string userId, string details, string severity = "INFO");
-        void LogPerformanceMetric(string metricName, double value, string unit = "ms");
-        void LogError(string message, Exception exception = null, string userId = null, string context = null);
-        void LogWarning(string message, string userId = null, string context = null);
-        void LogInfo(string message, string userId = null, string context = null);
-    }
-
     public class LoggingService : ILoggingService
     {
         private readonly ILogger<LoggingService> _logger;
@@ -29,7 +14,7 @@ namespace SecureLanChat.Services
             _httpContextAccessor = httpContextAccessor;
         }
 
-        public void LogUserAction(string userId, string action, string details = null)
+        public void LogUserAction(string userId, string action, string? details = null)
         {
             _logger.LogInformation("User Action - UserId: {UserId}, Action: {Action}, Details: {Details}, RequestId: {RequestId}",
                 userId, action, details, GetRequestId());
@@ -54,7 +39,7 @@ namespace SecureLanChat.Services
                 action, userId, connectionId, GetRequestId());
         }
 
-        public void LogEncryptionEvent(string userId, string eventType, bool success, string details = null)
+        public void LogEncryptionEvent(string userId, string eventType, bool success, string? details = null)
         {
             var logLevel = success ? LogLevel.Information : LogLevel.Error;
             _logger.Log(logLevel, "Encryption Event - UserId: {UserId}, EventType: {EventType}, Success: {Success}, Details: {Details}, RequestId: {RequestId}",
@@ -89,19 +74,19 @@ namespace SecureLanChat.Services
                 metricName, value, unit, GetRequestId());
         }
 
-        public void LogError(string message, Exception exception = null, string userId = null, string context = null)
+        public void LogError(string message, Exception? exception = null, string? userId = null, string? context = null)
         {
             _logger.LogError(exception, "Error - Message: {Message}, UserId: {UserId}, Context: {Context}, RequestId: {RequestId}",
                 message, userId, context, GetRequestId());
         }
 
-        public void LogWarning(string message, string userId = null, string context = null)
+        public void LogWarning(string message, string? userId = null, string? context = null)
         {
             _logger.LogWarning("Warning - Message: {Message}, UserId: {UserId}, Context: {Context}, RequestId: {RequestId}",
                 message, userId, context, GetRequestId());
         }
 
-        public void LogInfo(string message, string userId = null, string context = null)
+        public void LogInfo(string message, string? userId = null, string? context = null)
         {
             _logger.LogInformation("Info - Message: {Message}, UserId: {UserId}, Context: {Context}, RequestId: {RequestId}",
                 message, userId, context, GetRequestId());

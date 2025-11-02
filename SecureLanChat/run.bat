@@ -39,12 +39,12 @@ if %errorlevel% neq 0 (
 
 echo.
 echo Starting Secure LAN Chat Server...
-echo Server will be available at: https://localhost:5001
-echo HTTP version: http://localhost:5000
+echo Server will be available at: https://localhost:3000
+echo HTTP version: http://localhost:3001
 echo.
 echo Press Ctrl+C to stop the server
 echo.
 
-dotnet run
+dotnet run --launch-profile https
 
 pause

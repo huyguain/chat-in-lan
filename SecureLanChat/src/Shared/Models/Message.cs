@@ -22,6 +22,7 @@ namespace SecureLanChat.Models
         public MessageType MessageType { get; set; }
         
         public DateTime CreatedAt { get; set; }
+        public DateTime Timestamp { get; set; }
         
         // Navigation properties
         public virtual User Sender { get; set; } = null!;

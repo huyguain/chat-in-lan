@@ -1,6 +1,7 @@
 using System.Net;
 using System.Text.Json;
 using SecureLanChat.Models;
+using SecureLanChat.Exceptions;
 
 namespace SecureLanChat.Middleware
 {

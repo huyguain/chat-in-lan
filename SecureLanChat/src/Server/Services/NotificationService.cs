@@ -311,5 +311,129 @@ namespace SecureLanChat.Services
                 throw new NotificationException("Failed to notify message deleted", ex);
             }
         }
+
+        public async Task SendNotificationAsync(string userId, string message, NotificationType type)
+        {
+            try
+            {
+                if (string.IsNullOrEmpty(userId))
+                    throw new ArgumentException("User ID cannot be null or empty", nameof(userId));
+                if (string.IsNullOrEmpty(message))
+                    throw new ArgumentException("Message cannot be null or empty", nameof(message));
+
+                _logger.LogDebug("Sending notification to user {UserId}, type {Type}", userId, type);
+
+                var notification = new
+                {
+                    UserId = userId,
+                    Message = message,
+                    Type = type.ToString(),
+                    Timestamp = DateTime.UtcNow
+                };
+
+                await _hubContext.Clients.Group($"user_{userId}").SendAsync("Notification", notification);
+                _logger.LogDebug("Notification sent to user {UserId}", userId);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Failed to send notification to user {UserId}", userId);
+                throw new NotificationException("Failed to send notification", ex);
+            }
+        }
+
+        public async Task SendDesktopNotificationAsync(string title, string message)
+        {
+            try
+            {
+                if (string.IsNullOrEmpty(title))
+                    throw new ArgumentException("Title cannot be null or empty", nameof(title));
+                if (string.IsNullOrEmpty(message))
+                    throw new ArgumentException("Message cannot be null or empty", nameof(message));
+
+                _logger.LogDebug("Sending desktop notification: {Title}", title);
+
+                var notification = new
+                {
+                    Title = title,
+                    Message = message,
+                    Timestamp = DateTime.UtcNow
+                };
+
+                await _hubContext.Clients.All.SendAsync("DesktopNotification", notification);
+                _logger.LogDebug("Desktop notification sent");
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Failed to send desktop notification");
+                throw new NotificationException("Failed to send desktop notification", ex);
+            }
+        }
+
+        public async Task PlayNotificationSoundAsync()
+        {
+            try
+            {
+                _logger.LogDebug("Playing notification sound");
+
+                await _hubContext.Clients.All.SendAsync("PlaySound", new { Type = "notification" });
+                _logger.LogDebug("Notification sound played");
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Failed to play notification sound");
+                throw new NotificationException("Failed to play notification sound", ex);
+            }
+        }
+
+        // Unread count tracking - simple in-memory implementation
+        private static readonly Dictionary<string, int> _unreadCounts = new Dictionary<string, int>();
+
+        public async Task UpdateUnreadCountAsync(string userId, int count)
+        {
+            try
+            {
+                if (string.IsNullOrEmpty(userId))
+                    throw new ArgumentException("User ID cannot be null or empty", nameof(userId));
+
+                _logger.LogDebug("Updating unread count for user {UserId} to {Count}", userId, count);
+
+                _unreadCounts[userId] = count;
+
+                var notification = new
+                {
+                    UserId = userId,
+                    UnreadCount = count,
+                    Timestamp = DateTime.UtcNow
+                };
+
+                await _hubContext.Clients.Group($"user_{userId}").SendAsync("UnreadCountUpdate", notification);
+                _logger.LogDebug("Unread count updated for user {UserId}", userId);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Failed to update unread count for user {UserId}", userId);
+                throw new NotificationException("Failed to update unread count", ex);
+            }
+        }
+
+        public async Task<int> GetUnreadCountAsync(string userId)
+        {
+            try
+            {
+                if (string.IsNullOrEmpty(userId))
+                    return 0;
+
+                _logger.LogDebug("Getting unread count for user {UserId}", userId);
+
+                var count = _unreadCounts.TryGetValue(userId, out var unreadCount) ? unreadCount : 0;
+
+                return await Task.FromResult(count);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Failed to get unread count for user {UserId}", userId);
+                return 0;
+            }
+        }
     }
 }

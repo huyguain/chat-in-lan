@@ -174,8 +174,25 @@ class ClientEncryption {
     async importAESKey(aesKeyBase64) {
         try {
             console.log('Importing AES key...');
+            console.log('AES key base64 length:', aesKeyBase64?.length);
+            console.log('AES key base64 preview:', aesKeyBase64?.substring(0, 50));
+            
+            // Validate that we received a valid base64 string
+            if (!aesKeyBase64 || typeof aesKeyBase64 !== 'string') {
+                throw new Error('Invalid AES key: not a string');
+            }
             
             const keyData = this.base64ToArrayBuffer(aesKeyBase64);
+            console.log('Key data buffer size:', keyData.byteLength);
+            
+            // Validate key size (AES-128 should be 16 bytes = 128 bits)
+            if (keyData.byteLength !== 16) {
+                console.warn(`AES key size is ${keyData.byteLength} bytes, expected 16 bytes (128 bits)`);
+                // Still try to use it if it's close
+                if (keyData.byteLength < 16) {
+                    throw new Error(`AES key too short: ${keyData.byteLength} bytes (expected 16)`);
+                }
+            }
             
             this.aesKey = await window.crypto.subtle.importKey(
                 'raw',
@@ -192,6 +209,12 @@ class ClientEncryption {
             return true;
         } catch (error) {
             console.error('Failed to import AES key:', error);
+            console.error('Error details:', {
+                message: error.message,
+                stack: error.stack,
+                keyLength: aesKeyBase64?.length,
+                keyPreview: aesKeyBase64?.substring(0, 100)
+            });
             throw new Error('AES key import failed: ' + error.message);
         }
     }
@@ -240,14 +263,17 @@ class ClientEncryption {
 
     /**
      * Decrypt message with RSA private key
+     * @param {string} encryptedMessageBase64 - Base64 encoded encrypted message
+     * @param {boolean} returnAsText - If true, decode as UTF-8 text. If false, return as base64.
+     * @returns {Promise<string>} Decrypted message as text or base64
      */
-    async decryptWithRSA(encryptedMessageBase64) {
+    async decryptWithRSA(encryptedMessageBase64, returnAsText = true) {
         try {
             if (!this.rsaKeyPair) {
                 throw new Error('RSA key pair not available');
             }
 
-            console.log('Decrypting message with RSA...');
+            console.log('Decrypting with RSA...', { returnAsText });
             
             const encryptedBuffer = this.base64ToArrayBuffer(encryptedMessageBase64);
             const decrypted = await window.crypto.subtle.decrypt(
@@ -258,12 +284,18 @@ class ClientEncryption {
                 encryptedBuffer
             );
 
-            const decryptedMessage = new TextDecoder().decode(decrypted);
-            console.log('Message decrypted with RSA successfully');
-            
-            return decryptedMessage;
+            if (returnAsText) {
+                const decryptedMessage = new TextDecoder().decode(decrypted);
+                console.log('Message decrypted with RSA successfully (as text)');
+                return decryptedMessage;
+            } else {
+                // Return as base64 for binary data like AES keys
+                const decryptedBase64 = this.arrayBufferToBase64(decrypted);
+                console.log('Data decrypted with RSA successfully (as base64)');
+                return decryptedBase64;
+            }
         } catch (error) {
-            console.error('Failed to decrypt message with RSA:', error);
+            console.error('Failed to decrypt with RSA:', error);
             throw new Error('RSA decryption failed: ' + error.message);
         }
     }
@@ -320,13 +352,43 @@ class ClientEncryption {
                 throw new Error('AES key not available');
             }
 
+            if (!encryptedMessageBase64 || typeof encryptedMessageBase64 !== 'string') {
+                throw new Error('Invalid encrypted message: not a string');
+            }
+
+            // Clean and validate base64
+            const cleanedBase64 = encryptedMessageBase64.trim();
+            if (cleanedBase64.length === 0) {
+                throw new Error('Invalid encrypted message: empty string');
+            }
+
             console.log('Decrypting message with AES...');
+            console.log('Encrypted message length (base64):', cleanedBase64.length);
             
-            const combined = this.base64ToArrayBuffer(encryptedMessageBase64);
+            // Decode base64 to get actual byte length
+            let combined;
+            try {
+                combined = this.base64ToArrayBuffer(cleanedBase64);
+            } catch (decodeError) {
+                throw new Error('Invalid base64 format: ' + decodeError.message);
+            }
+            
+            console.log('Decoded byte length:', combined.byteLength);
+            
+            // Validate minimum length: 16 bytes (IV) + at least 16 bytes (encrypted content with padding)
+            if (combined.byteLength < 32) {
+                throw new Error(`Message too short: ${combined.byteLength} bytes (minimum 32 bytes required for IV + encrypted content)`);
+            }
             
             // Extract IV and encrypted data
             const iv = combined.slice(0, 16);
             const encrypted = combined.slice(16);
+            
+            if (encrypted.byteLength === 0) {
+                throw new Error('No encrypted content found after IV');
+            }
+            
+            console.log('IV length:', iv.byteLength, 'Encrypted length:', encrypted.byteLength);
             
             const decrypted = await window.crypto.subtle.decrypt(
                 {
@@ -338,11 +400,13 @@ class ClientEncryption {
             );
 
             const decryptedMessage = new TextDecoder().decode(decrypted);
-            console.log('Message decrypted with AES successfully');
+            console.log('Message decrypted with AES successfully. Decrypted length:', decryptedMessage.length);
             
             return decryptedMessage;
         } catch (error) {
             console.error('Failed to decrypt message with AES:', error);
+            console.error('Encrypted message preview:', encryptedMessageBase64?.substring(0, 100));
+            console.error('Encrypted message length:', encryptedMessageBase64?.length);
             throw new Error('AES decryption failed: ' + error.message);
         }
     }
@@ -370,13 +434,21 @@ class ClientEncryption {
     async decryptAESKeyWithRSA(encryptedAESKeyBase64) {
         try {
             console.log('Decrypting AES key with RSA...');
+            console.log('Encrypted AES key length:', encryptedAESKeyBase64?.length);
             
-            const decryptedAESKey = await this.decryptWithRSA(encryptedAESKeyBase64);
+            // Decrypt as binary data (not text), return as base64
+            const decryptedAESKey = await this.decryptWithRSA(encryptedAESKeyBase64, false);
             console.log('AES key decrypted with RSA successfully');
+            console.log('Decrypted AES key length:', decryptedAESKey?.length);
             
             return decryptedAESKey;
         } catch (error) {
             console.error('Failed to decrypt AES key with RSA:', error);
+            console.error('Error details:', {
+                message: error.message,
+                stack: error.stack,
+                encryptedKeyLength: encryptedAESKeyBase64?.length
+            });
             throw new Error('AES key decryption failed: ' + error.message);
         }
     }
@@ -426,24 +498,54 @@ class ClientEncryption {
      * Utility: Convert ArrayBuffer to Base64
      */
     arrayBufferToBase64(buffer) {
-        const bytes = new Uint8Array(buffer);
-        let binary = '';
-        for (let i = 0; i < bytes.byteLength; i++) {
-            binary += String.fromCharCode(bytes[i]);
+        try {
+            const bytes = new Uint8Array(buffer);
+            let binary = '';
+            for (let i = 0; i < bytes.byteLength; i++) {
+                binary += String.fromCharCode(bytes[i]);
+            }
+            const base64 = window.btoa(binary);
+            
+            // Validate that we created valid base64
+            if (!/^[A-Za-z0-9+/]*={0,2}$/.test(base64)) {
+                console.error('Generated invalid base64!');
+                throw new Error('arrayBufferToBase64 generated invalid base64');
+            }
+            
+            return base64;
+        } catch (error) {
+            console.error('arrayBufferToBase64 error:', error);
+            console.error('Buffer size:', buffer?.byteLength);
+            throw new Error(`Failed to convert ArrayBuffer to base64: ${error.message}`);
         }
-        return window.btoa(binary);
     }
 
     /**
      * Utility: Convert Base64 to ArrayBuffer
      */
     base64ToArrayBuffer(base64) {
-        const binary = window.atob(base64);
-        const bytes = new Uint8Array(binary.length);
-        for (let i = 0; i < binary.length; i++) {
-            bytes[i] = binary.charCodeAt(i);
+        try {
+            // Clean base64 string - remove whitespace and URL-unsafe characters
+            const cleanedBase64 = base64.trim().replace(/\s+/g, '').replace(/[^A-Za-z0-9+/=]/g, '');
+            
+            // Validate base64 format
+            if (!/^[A-Za-z0-9+/]*={0,2}$/.test(cleanedBase64)) {
+                console.error('Invalid base64 format:', base64.substring(0, 50));
+                throw new Error('Invalid base64 string format');
+            }
+            
+            const binary = window.atob(cleanedBase64);
+            const bytes = new Uint8Array(binary.length);
+            for (let i = 0; i < binary.length; i++) {
+                bytes[i] = binary.charCodeAt(i);
+            }
+            return bytes.buffer;
+        } catch (error) {
+            console.error('base64ToArrayBuffer error:', error);
+            console.error('Base64 string length:', base64?.length);
+            console.error('Base64 preview:', base64?.substring(0, 100));
+            throw new Error(`Failed to decode base64: ${error.message}`);
         }
-        return bytes.buffer;
     }
 }
 

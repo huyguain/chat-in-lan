@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Mvc;
 using SecureLanChat.Interfaces;
 using SecureLanChat.Models;
 using SecureLanChat.Exceptions;
+using SecureLanChat.Services;
 using System.ComponentModel.DataAnnotations;
 
 namespace SecureLanChat.Controllers
@@ -39,7 +40,7 @@ namespace SecureLanChat.Controllers
 
                 _logger.LogInformation("Login attempt for user {Username}", request.Username);
 
-                var user = await _userService.LoginAsync(request.Username, request.Password);
+                var user = await _userService.LoginAsync(request.Username);
 
                 // Generate encryption keys for the session
                 var keyPair = await _encryptionService.GenerateKeyPairAsync();
@@ -332,18 +333,4 @@ namespace SecureLanChat.Controllers
         public string Message { get; set; } = string.Empty;
     }
 
-    public class UpdateStatusRequest
-    {
-        [Required]
-        public bool IsOnline { get; set; }
-    }
-
-    public class UserDto
-    {
-        public string Id { get; set; } = string.Empty;
-        public string Username { get; set; } = string.Empty;
-        public string? Email { get; set; }
-        public bool IsOnline { get; set; }
-        public DateTime LastSeen { get; set; }
-    }
 }

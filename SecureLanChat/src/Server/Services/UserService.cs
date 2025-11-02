@@ -27,15 +27,12 @@ namespace SecureLanChat.Services
             _keyStorageService = keyStorageService;
         }
 
-        public async Task<User> LoginAsync(string username, string password)
+        public async Task<User> LoginAsync(string username)
         {
             try
             {
                 if (string.IsNullOrEmpty(username))
                     throw new ArgumentException("Username cannot be null or empty", nameof(username));
-                
-                if (string.IsNullOrEmpty(password))
-                    throw new ArgumentException("Password cannot be null or empty", nameof(password));
 
                 _logger.LogInformation("Attempting login for user {Username}", username);
 
@@ -48,13 +45,6 @@ namespace SecureLanChat.Services
                     throw new UserNotFoundException(username);
                 }
 
-                // Verify password (in real implementation, use proper password hashing)
-                if (!VerifyPassword(password, user.PasswordHash))
-                {
-                    _loggingService.LogSecurityEvent("failed_login", username, "Invalid password", "WARNING");
-                    throw new InvalidCredentialsException();
-                }
-
                 // Update user status
                 user.IsOnline = true;
                 user.LastSeen = DateTime.UtcNow;
@@ -65,14 +55,14 @@ namespace SecureLanChat.Services
 
                 return user;
             }
-            catch (Exception ex) when (!(ex is UserNotFoundException) && !(ex is InvalidCredentialsException) && !(ex is ArgumentException))
+            catch (Exception ex) when (!(ex is UserNotFoundException) && !(ex is ArgumentException))
             {
                 _logger.LogError(ex, "Failed to login user {Username}", username);
                 throw new DatabaseException("Failed to login user", ex);
             }
         }
 
-        public async Task<User> RegisterAsync(string username, string password, string email = null)
+        public async Task<User> RegisterAsync(string username, string password, string? email = null)
         {
             try
             {
@@ -193,7 +183,7 @@ namespace SecureLanChat.Services
             }
         }
 
-        public async Task<User> GetUserByIdAsync(string userId)
+        public async Task<User?> GetUserByIdAsync(string userId)
         {
             try
             {
@@ -205,14 +195,9 @@ namespace SecureLanChat.Services
                 var user = await _context.Users
                     .FirstOrDefaultAsync(u => u.Id.ToString() == userId);
 
-                if (user == null)
-                {
-                    throw new UserNotFoundException(userId);
-                }
-
                 return user;
             }
-            catch (Exception ex) when (!(ex is UserNotFoundException) && !(ex is ArgumentException))
+            catch (Exception ex) when (!(ex is ArgumentException))
             {
                 _logger.LogError(ex, "Failed to retrieve user {UserId}", userId);
                 throw new DatabaseException("Failed to retrieve user", ex);
@@ -245,14 +230,14 @@ namespace SecureLanChat.Services
             }
         }
 
-        public async Task UpdateUserStatusAsync(string userId, bool isOnline)
+        public async Task UpdateUserStatusAsync(string userId, UserStatus status)
         {
             try
             {
                 if (string.IsNullOrEmpty(userId))
                     throw new ArgumentException("User ID cannot be null or empty", nameof(userId));
 
-                _logger.LogDebug("Updating user status for {UserId} to {Status}", userId, isOnline);
+                _logger.LogDebug("Updating user status for {UserId} to {Status}", userId, status);
 
                 var user = await _context.Users
                     .FirstOrDefaultAsync(u => u.Id.ToString() == userId);
@@ -262,17 +247,23 @@ namespace SecureLanChat.Services
                     throw new UserNotFoundException(userId);
                 }
 
-                user.IsOnline = isOnline;
+                user.IsOnline = (status == UserStatus.Online);
                 user.LastSeen = DateTime.UtcNow;
                 await _context.SaveChangesAsync();
 
-                _loggingService.LogUserAction(userId, "status_update", $"User status updated to {(isOnline ? "online" : "offline")}");
+                _loggingService.LogUserAction(userId, "status_update", $"User status updated to {status}");
             }
             catch (Exception ex) when (!(ex is UserNotFoundException) && !(ex is ArgumentException))
             {
                 _logger.LogError(ex, "Failed to update user status for {UserId}", userId);
                 throw new DatabaseException("Failed to update user status", ex);
             }
+        }
+
+        public async Task UpdateUserStatusAsync(string userId, bool isOnline)
+        {
+            var status = isOnline ? UserStatus.Online : UserStatus.Offline;
+            await UpdateUserStatusAsync(userId, status);
         }
 
         public async Task<bool> ValidateUserAsync(string userId)
@@ -341,6 +332,33 @@ namespace SecureLanChat.Services
             {
                 _logger.LogError(ex, "Failed to update last seen for user {UserId}", userId);
                 throw new DatabaseException("Failed to update last seen", ex);
+            }
+        }
+
+        public async Task<bool> ValidateUsernameAsync(string username)
+        {
+            try
+            {
+                if (string.IsNullOrEmpty(username))
+                    return false;
+
+                if (username.Length < 3 || username.Length > 50)
+                    return false;
+
+                // Check if username contains only allowed characters
+                if (!System.Text.RegularExpressions.Regex.IsMatch(username, @"^[a-zA-Z0-9_]+$"))
+                    return false;
+
+                // Check if username already exists
+                var existingUser = await _context.Users
+                    .FirstOrDefaultAsync(u => u.Username == username);
+
+                return existingUser == null;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Failed to validate username {Username}", username);
+                return false;
             }
         }
 

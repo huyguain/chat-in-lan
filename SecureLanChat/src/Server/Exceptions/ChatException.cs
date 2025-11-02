@@ -116,4 +116,12 @@ namespace SecureLanChat.Exceptions
         {
         }
     }
+
+    public class NotificationException : ChatException
+    {
+        public NotificationException(string message, Exception? innerException = null)
+            : base(message, HttpStatusCode.InternalServerError, innerException?.Message, "NOTIFICATION_ERROR")
+        {
+        }
+    }
 }

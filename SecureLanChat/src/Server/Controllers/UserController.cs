@@ -265,12 +265,6 @@ namespace SecureLanChat.Controllers
     }
 
     // Request/Response Models
-    public class UpdateStatusRequest
-    {
-        [Required]
-        public bool IsOnline { get; set; }
-    }
-
     public class ValidationResponse
     {
         public bool IsValid { get; set; }
@@ -289,15 +283,5 @@ namespace SecureLanChat.Controllers
         public int OnlineUsers { get; set; }
         public int OfflineUsers { get; set; }
         public DateTime LastUpdated { get; set; }
-    }
-
-    public class UserDto
-    {
-        public string Id { get; set; } = string.Empty;
-        public string Username { get; set; } = string.Empty;
-        public string? Email { get; set; }
-        public bool IsOnline { get; set; }
-        public DateTime LastSeen { get; set; }
-        public DateTime CreatedAt { get; set; }
     }
 }

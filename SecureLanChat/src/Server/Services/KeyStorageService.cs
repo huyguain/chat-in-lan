@@ -7,17 +7,6 @@ using System.Security.Cryptography;
 
 namespace SecureLanChat.Services
 {
-    public interface IKeyStorageService
-    {
-        Task<string> StoreUserPublicKeyAsync(string userId, string publicKey);
-        Task<string> GetUserPublicKeyAsync(string userId);
-        Task<string> StoreSessionKeyAsync(string userId, string connectionId, string aesKey);
-        Task<string> GetSessionKeyAsync(string userId, string connectionId);
-        Task<bool> ValidateStoredKeyAsync(string userId, string keyType);
-        Task CleanupExpiredKeysAsync();
-        Task<bool> KeyExistsAsync(string userId, string keyType);
-    }
-
     public class KeyStorageService : IKeyStorageService
     {
         private readonly ChatDbContext _context;
@@ -286,6 +275,51 @@ namespace SecureLanChat.Services
             {
                 _logger.LogError(ex, "Failed to check if key exists for user {UserId}", userId);
                 return false;
+            }
+        }
+
+        public async Task<List<Session>> GetAllActiveSessionsAsync()
+        {
+            try
+            {
+                _logger.LogDebug("Retrieving all active sessions");
+
+                var sessions = await _context.Sessions
+                    .Where(s => s.IsActive && s.ExpiresAt > DateTime.UtcNow)
+                    .ToListAsync();
+
+                _logger.LogDebug("Found {Count} active sessions", sessions.Count);
+                return sessions;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Failed to retrieve all active sessions");
+                throw new DatabaseException("Failed to retrieve active sessions", ex);
+            }
+        }
+
+        public async Task<List<Session>> GetActiveSessionsByUserIdAsync(string userId)
+        {
+            try
+            {
+                if (string.IsNullOrEmpty(userId))
+                    throw new ArgumentException("User ID cannot be null or empty", nameof(userId));
+
+                _logger.LogDebug("Retrieving active sessions for user {UserId}", userId);
+
+                var sessions = await _context.Sessions
+                    .Where(s => s.UserId.ToString() == userId && 
+                               s.IsActive && 
+                               s.ExpiresAt > DateTime.UtcNow)
+                    .ToListAsync();
+
+                _logger.LogDebug("Found {Count} active sessions for user {UserId}", sessions.Count, userId);
+                return sessions;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Failed to retrieve active sessions for user {UserId}", userId);
+                throw new DatabaseException("Failed to retrieve active sessions for user", ex);
             }
         }
     }

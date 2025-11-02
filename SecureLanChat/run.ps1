@@ -55,12 +55,12 @@ try {
 Write-Host ""
 Write-Host "Starting Secure LAN Chat Server..." -ForegroundColor Cyan
 Write-Host "Server will be available at:" -ForegroundColor White
-Write-Host "  • HTTPS: https://localhost:5001" -ForegroundColor Green
-Write-Host "  • HTTP:  http://localhost:5000" -ForegroundColor Green
-Write-Host "  • Swagger: https://localhost:5001/swagger" -ForegroundColor Green
+Write-Host "  • HTTPS: https://localhost:3000" -ForegroundColor Green
+Write-Host "  • HTTP:  http://localhost:3001" -ForegroundColor Green
+Write-Host "  • Swagger: https://localhost:3000/swagger" -ForegroundColor Green
 Write-Host ""
 Write-Host "Press Ctrl+C to stop the server" -ForegroundColor Yellow
 Write-Host ""
 
-# Run the application
-dotnet run
+# Run the application with HTTPS profile
+dotnet run --launch-profile https

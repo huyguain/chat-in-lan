@@ -10,6 +10,11 @@ namespace SecureLanChat.Models
         [StringLength(50)]
         public string Username { get; set; } = string.Empty;
         
+        [EmailAddress]
+        public string? Email { get; set; }
+        
+        public string? PasswordHash { get; set; }
+        
         [Required]
         [StringLength(2048)]
         public string PublicKey { get; set; } = string.Empty;

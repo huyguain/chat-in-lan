@@ -50,6 +50,101 @@ namespace SecureLanChat.Services
             }
         }
 
+        public async Task SendMessageAsync(string senderId, string receiverId, string content)
+        {
+            try
+            {
+                if (string.IsNullOrEmpty(senderId))
+                    throw new ArgumentException("Sender ID cannot be null or empty", nameof(senderId));
+                if (string.IsNullOrEmpty(receiverId))
+                    throw new ArgumentException("Receiver ID cannot be null or empty", nameof(receiverId));
+                if (string.IsNullOrEmpty(content))
+                    throw new ArgumentException("Content cannot be null or empty", nameof(content));
+
+                var now = DateTime.UtcNow;
+                var message = new Message
+                {
+                    Id = Guid.NewGuid(),
+                    SenderId = Guid.Parse(senderId),
+                    ReceiverId = Guid.Parse(receiverId),
+                    Content = content,
+                    MessageType = MessageType.Private,
+                    CreatedAt = now,
+                    Timestamp = now,
+                    IV = string.Empty // Will be set during encryption
+                };
+
+                await SaveMessageAsync(message);
+                _logger.LogInformation("Message sent from {SenderId} to {ReceiverId}", senderId, receiverId);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Failed to send message from {SenderId} to {ReceiverId}", senderId, receiverId);
+                throw new DatabaseException("Failed to send message", ex);
+            }
+        }
+
+        public async Task SendBroadcastAsync(string senderId, string content)
+        {
+            try
+            {
+                if (string.IsNullOrEmpty(senderId))
+                    throw new ArgumentException("Sender ID cannot be null or empty", nameof(senderId));
+                if (string.IsNullOrEmpty(content))
+                    throw new ArgumentException("Content cannot be null or empty", nameof(content));
+
+                var now = DateTime.UtcNow;
+                var message = new Message
+                {
+                    Id = Guid.NewGuid(),
+                    SenderId = Guid.Parse(senderId),
+                    ReceiverId = null,
+                    Content = content,
+                    MessageType = MessageType.Broadcast,
+                    CreatedAt = now,
+                    Timestamp = now,
+                    IV = string.Empty // Will be set during encryption
+                };
+
+                await SaveMessageAsync(message);
+                _logger.LogInformation("Broadcast message sent from {SenderId}", senderId);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Failed to send broadcast from {SenderId}", senderId);
+                throw new DatabaseException("Failed to send broadcast", ex);
+            }
+        }
+
+        public async Task<List<Message>> GetMessageHistoryAsync(string userId, int page = 1, int pageSize = 50)
+        {
+            try
+            {
+                if (string.IsNullOrEmpty(userId))
+                    throw new ArgumentException("User ID cannot be null or empty", nameof(userId));
+
+                _logger.LogDebug("Getting message history for user {UserId}, page {Page}, pageSize {PageSize}", 
+                    userId, page, pageSize);
+
+                var skip = (page - 1) * pageSize;
+
+                var messages = await _context.Messages
+                    .Where(m => m.SenderId.ToString() == userId || m.ReceiverId.ToString() == userId || m.ReceiverId == null)
+                    .OrderByDescending(m => m.CreatedAt)
+                    .Skip(skip)
+                    .Take(pageSize)
+                    .ToListAsync();
+
+                _logger.LogDebug("Retrieved {Count} messages for user {UserId}", messages.Count, userId);
+                return messages;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Failed to get message history for user {UserId}", userId);
+                throw new DatabaseException("Failed to get message history", ex);
+            }
+        }
+
         public async Task<List<Message>> GetMessageHistoryAsync(string userId, string? otherUserId = null, int limit = 50)
         {
             try
@@ -76,7 +171,7 @@ namespace SecureLanChat.Services
                 }
 
                 var messages = await query
-                    .OrderByDescending(m => m.Timestamp)
+                    .OrderByDescending(m => m.CreatedAt)
                     .Take(limit)
                     .ToListAsync();
 
@@ -97,7 +192,7 @@ namespace SecureLanChat.Services
                 _logger.LogDebug("Getting recent messages, limit {Limit}", limit);
 
                 var messages = await _context.Messages
-                    .OrderByDescending(m => m.Timestamp)
+                    .OrderByDescending(m => m.CreatedAt)
                     .Take(limit)
                     .ToListAsync();
 
@@ -186,37 +281,63 @@ namespace SecureLanChat.Services
             }
         }
 
-        public async Task<bool> DeleteMessageAsync(string messageId, string userId)
+        public async Task DeleteMessageAsync(string messageId)
         {
             try
             {
                 if (string.IsNullOrEmpty(messageId))
                     throw new ArgumentException("Message ID cannot be null or empty", nameof(messageId));
-                
-                if (string.IsNullOrEmpty(userId))
-                    throw new ArgumentException("User ID cannot be null or empty", nameof(userId));
 
-                _logger.LogDebug("Deleting message {MessageId} by user {UserId}", messageId, userId);
+                _logger.LogDebug("Deleting message {MessageId}", messageId);
 
                 var message = await _context.Messages
-                    .FirstOrDefaultAsync(m => m.Id.ToString() == messageId && m.SenderId.ToString() == userId);
+                    .FirstOrDefaultAsync(m => m.Id.ToString() == messageId);
 
                 if (message == null)
                 {
-                    _logger.LogWarning("Message {MessageId} not found or user {UserId} not authorized", messageId, userId);
-                    return false;
+                    _logger.LogWarning("Message {MessageId} not found", messageId);
+                    return;
                 }
 
                 _context.Messages.Remove(message);
                 await _context.SaveChangesAsync();
 
                 _logger.LogDebug("Message {MessageId} deleted successfully", messageId);
-                return true;
             }
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Failed to delete message {MessageId}", messageId);
                 throw new DatabaseException("Failed to delete message", ex);
+            }
+        }
+
+        public async Task<List<Message>> SearchMessagesAsync(string userId, string searchTerm)
+        {
+            try
+            {
+                if (string.IsNullOrEmpty(userId))
+                    throw new ArgumentException("User ID cannot be null or empty", nameof(userId));
+                if (string.IsNullOrEmpty(searchTerm))
+                    throw new ArgumentException("Search term cannot be null or empty", nameof(searchTerm));
+
+                _logger.LogDebug("Searching messages with term '{SearchTerm}' for user {UserId}", 
+                    searchTerm, userId);
+
+                // Note: In a real implementation, you would need to decrypt messages for searching
+                // For now, we'll search in the encrypted content (not ideal for production)
+                var messages = await _context.Messages
+                    .Where(m => (m.SenderId.ToString() == userId || m.ReceiverId.ToString() == userId || m.ReceiverId == null) &&
+                               m.Content.Contains(searchTerm))
+                    .OrderByDescending(m => m.CreatedAt)
+                    .ToListAsync();
+
+                _logger.LogDebug("Found {Count} messages matching search term '{SearchTerm}'", messages.Count, searchTerm);
+                return messages;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Failed to search messages with term '{SearchTerm}'", searchTerm);
+                throw new DatabaseException("Failed to search messages", ex);
             }
         }
 
@@ -241,7 +362,7 @@ namespace SecureLanChat.Services
                 // For now, we'll search in the encrypted content (not ideal for production)
                 var messages = await query
                     .Where(m => m.Content.Contains(searchTerm))
-                    .OrderByDescending(m => m.Timestamp)
+                    .OrderByDescending(m => m.CreatedAt)
                     .Take(limit)
                     .ToListAsync();
 
@@ -288,7 +409,7 @@ namespace SecureLanChat.Services
                     startDate, endDate, userId, limit);
 
                 var query = _context.Messages
-                    .Where(m => m.Timestamp >= startDate && m.Timestamp <= endDate);
+                    .Where(m => m.CreatedAt >= startDate && m.CreatedAt <= endDate);
 
                 if (!string.IsNullOrEmpty(userId))
                 {
@@ -318,7 +439,7 @@ namespace SecureLanChat.Services
                 _logger.LogInformation("Cleaning up messages older than {CutoffDate}", cutoffDate);
 
                 var oldMessages = await _context.Messages
-                    .Where(m => m.Timestamp < cutoffDate)
+                    .Where(m => m.CreatedAt < cutoffDate)
                     .ToListAsync();
 
                 if (oldMessages.Any())
