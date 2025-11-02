@@ -5,8 +5,19 @@ using SecureLanChat.Hubs;
 using SecureLanChat.Interfaces;
 using SecureLanChat.Middleware;
 using Serilog;
+using Microsoft.AspNetCore.Server.Kestrel.Core;
 
 var builder = WebApplication.CreateBuilder(args);
+
+// Configure Kestrel for HTTPS
+builder.WebHost.ConfigureKestrel(options =>
+{
+    options.ConfigureHttpsDefaults(httpsOptions =>
+    {
+        // Use the development certificate automatically
+        // This ensures HTTPS works properly with the dev certificate
+    });
+});
 
 // Configure Serilog
 Log.Logger = new LoggerConfiguration()
