@@ -17,6 +17,22 @@ Chúng em xin chân thành cảm ơn!
 
 ---
 
+## CHƯƠNG III. TỔNG QUAN VỀ PHẦN MỀM
+
+### 3.1 Giới thiệu về phần mềm
+
+Phần mềm quản lý chat mã hóa trong mạng LAN được thiết kế nhằm hỗ trợ tối ưu hóa quy trình giao tiếp và trao đổi thông tin nội bộ một cách an toàn, hiệu quả, giảm tải công việc thủ công và đảm bảo tính bảo mật cao trong quản lý thông tin. Phần mềm phân quyền rõ ràng cho các tác nhân tham gia, bao gồm:
+
++ **Admin**: Quản trị hệ thống, phân quyền, quản lý tài khoản người dùng, theo dõi hoạt động hệ thống và đảm bảo an ninh thông tin. Admin có quyền truy cập vào tất cả các chức năng quản lý, bao gồm xem danh sách người dùng, quản lý tài khoản, và theo dõi các sự kiện bảo mật trong hệ thống.
+
++ **Cán bộ/Giáo viên**: Đăng ký tài khoản, đăng nhập vào hệ thống, gửi và nhận tin nhắn riêng tư với các người dùng khác, tham gia chat nhóm (broadcast), xem lịch sử tin nhắn, và theo dõi trạng thái online/offline của các người dùng khác trong mạng LAN.
+
++ **Học viên**: Đăng ký tài khoản, đăng nhập vào hệ thống, gửi và nhận tin nhắn riêng tư, tham gia chat nhóm, xem lịch sử tin nhắn đã trao đổi, và xem danh sách người dùng đang online trong hệ thống.
+
+Để sử dụng được các chức năng của phần mềm, người dùng cần đăng nhập vào hệ thống. Giao diện màn hình đăng nhập của phần mềm quản lý chat mã hóa trong mạng LAN được thiết kế đơn giản, thân thiện với người dùng. Màn hình bao gồm hai trường nhập liệu chính: **Tài khoản (Username)** và **Mật khẩu (Password)**, nơi người dùng nhập thông tin đăng nhập đã được đăng ký trước đó để truy cập hệ thống. Phía dưới có các nút chức năng: **Đăng nhập** để xác thực thông tin và truy cập vào hệ thống chat, cùng với liên kết **Đăng ký** giúp người dùng mới tạo tài khoản trong trường hợp chưa có tài khoản. Sau khi đăng nhập thành công, hệ thống sẽ tự động kết nối SignalR, trao đổi khóa mã hóa để thiết lập phiên làm việc an toàn, và đưa người dùng đến giao diện chat chính. Tại đây, người dùng có thể xem danh sách người dùng đang online, gửi tin nhắn riêng tư hoặc tham gia chat nhóm, đồng thời xem lại lịch sử tin nhắn đã trao đổi trước đó.
+
+---
+
 ### 1.1 Khảo sát bài toán
 
 #### 1.1.1 Phát biểu bài toán
@@ -939,38 +955,289 @@ Nhờ sử dụng thuật toán mã hóa đối xứng AES với khóa định s
 
 ### 2.4 Đóng gói phần mềm
 
-**Các bước đóng gói:**
+Đóng gói phần mềm là bước quan trọng cuối cùng trong quy trình phát triển, giúp tạo ra một sản phẩm hoàn chỉnh có thể triển khai và sử dụng dễ dàng. Hệ thống chat mã hóa trong mạng LAN được đóng gói theo các phương pháp sau:
 
-1. **Publish ứng dụng:**
+#### 2.4.1 Publish ứng dụng
+
+**Bước 1: Chuẩn bị môi trường**
+
+Trước khi publish, cần đảm bảo:
+- Đã cài đặt .NET SDK 8.0 hoặc 6.0
+- Đã cấu hình connection string trong `appsettings.json`
+- Đã test ứng dụng hoạt động ổn định
+
+**Bước 2: Publish ứng dụng**
+
+Có hai phương pháp publish chính:
+
+**a. Framework-dependent deployment (FDD):**
+Yêu cầu máy đích phải có .NET Runtime đã cài đặt.
 
 ```bash
-dotnet publish -c Release -o ./publish
+cd src/Server
+dotnet publish -c Release -o ../../publish
 ```
 
-2. **Tạo file cài đặt:**
-   - Có thể dùng Inno Setup hoặc NSIS
-   - Hoặc đóng gói thành Docker container
+**b. Self-contained deployment (SCD):**
+Bao gồm cả .NET Runtime, không cần cài đặt .NET trên máy đích.
 
-3. **Tạo script chạy:**
-   - `run.bat` cho Windows
-   - `run.ps1` cho PowerShell
-   - `run.sh` cho Linux
+```bash
+# Windows
+dotnet publish -c Release -r win-x64 --self-contained true -o ../../publish/win-x64
 
-4. **Tài liệu hướng dẫn:**
-   - README.md
-   - Hướng dẫn cài đặt
-   - Hướng dẫn sử dụng
+# Linux
+dotnet publish -c Release -r linux-x64 --self-contained true -o ../../publish/linux-x64
+```
 
-**Cấu trúc đóng gói:**
+**Bước 3: Copy các file cần thiết**
+
+Sau khi publish, cần copy thêm:
+- File `appsettings.json` (nếu chưa có trong publish)
+- Thư mục `Client/wwwroot` (frontend files)
+- File script chạy (`run.bat`, `run.ps1`)
+
+#### 2.4.2 Cấu trúc thư mục sau khi đóng gói
 
 ```
-SecureLanChat/
-├── publish/              # Files đã build
-├── run.bat              # Script chạy Windows
-├── run.ps1              # Script chạy PowerShell
-├── README.md            # Tài liệu
-└── appsettings.json     # Cấu hình
+SecureLanChat-Package/
+├── publish/                      # Thư mục chứa files đã build
+│   ├── SecureLanChat.exe        # File thực thi chính (Windows)
+│   ├── SecureLanChat.dll        # File DLL chính
+│   ├── appsettings.json         # File cấu hình
+│   ├── wwwroot/                 # Frontend files (HTML, CSS, JS)
+│   └── [các file dependencies]  # Các thư viện cần thiết
+├── run.bat                      # Script chạy cho Windows
+├── run.ps1                       # Script chạy cho PowerShell
+├── run.sh                        # Script chạy cho Linux
+├── README.md                     # Tài liệu hướng dẫn
+├── HUONG-DAN-CAI-DAT.md         # Hướng dẫn cài đặt chi tiết
+└── appsettings.json              # File cấu hình mẫu
 ```
+
+#### 2.4.3 Tạo script chạy ứng dụng
+
+**a. Script Windows (run.bat):**
+
+```batch
+@echo off
+echo ========================================
+echo    Secure LAN Chat System
+echo ========================================
+echo.
+
+echo Checking .NET Runtime...
+dotnet --version
+if %errorlevel% neq 0 (
+    echo ERROR: .NET Runtime not found!
+    echo Please install .NET 8.0 Runtime
+    pause
+    exit /b 1
+)
+
+echo.
+echo Starting Secure LAN Chat Server...
+echo Server will be available at: https://localhost:7000
+echo.
+echo Press Ctrl+C to stop the server
+echo.
+
+cd publish
+dotnet SecureLanChat.dll
+
+pause
+```
+
+**b. Script PowerShell (run.ps1):**
+
+```powershell
+Write-Host "========================================" -ForegroundColor Cyan
+Write-Host "   Secure LAN Chat System" -ForegroundColor Cyan
+Write-Host "========================================" -ForegroundColor Cyan
+Write-Host ""
+
+# Check .NET Runtime
+try {
+    $dotnetVersion = dotnet --version
+    Write-Host "Found .NET Runtime: $dotnetVersion" -ForegroundColor Green
+} catch {
+    Write-Host "ERROR: .NET Runtime not found!" -ForegroundColor Red
+    Write-Host "Please install .NET 8.0 Runtime" -ForegroundColor Yellow
+    exit 1
+}
+
+Write-Host ""
+Write-Host "Starting Secure LAN Chat Server..." -ForegroundColor Green
+Write-Host "Server will be available at: https://localhost:7000" -ForegroundColor Yellow
+Write-Host "Press Ctrl+C to stop the server" -ForegroundColor Yellow
+Write-Host ""
+
+Set-Location publish
+dotnet SecureLanChat.dll
+```
+
+**c. Script Linux (run.sh):**
+
+```bash
+#!/bin/bash
+
+echo "========================================"
+echo "   Secure LAN Chat System"
+echo "========================================"
+echo ""
+
+# Check .NET Runtime
+if ! command -v dotnet &> /dev/null; then
+    echo "ERROR: .NET Runtime not found!"
+    echo "Please install .NET 8.0 Runtime"
+    exit 1
+fi
+
+echo "Found .NET Runtime: $(dotnet --version)"
+echo ""
+echo "Starting Secure LAN Chat Server..."
+echo "Server will be available at: https://localhost:7000"
+echo "Press Ctrl+C to stop the server"
+echo ""
+
+cd publish
+dotnet SecureLanChat.dll
+```
+
+#### 2.4.4 Tạo file cài đặt (Installer)
+
+**Phương pháp 1: Sử dụng Inno Setup (Windows)**
+
+1. Tải và cài đặt Inno Setup từ https://jrsoftware.org/isinfo.php
+2. Tạo script `.iss`:
+
+```iss
+[Setup]
+AppName=Secure LAN Chat
+AppVersion=1.0
+DefaultDirName={pf}\SecureLanChat
+DefaultGroupName=Secure LAN Chat
+OutputDir=installer
+OutputBaseFilename=SecureLanChat-Setup
+Compression=lzma
+SolidCompression=yes
+
+[Files]
+Source: "publish\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs
+Source: "run.bat"; DestDir: "{app}"; Flags: ignoreversion
+Source: "README.md"; DestDir: "{app}"; Flags: ignoreversion
+
+[Icons]
+Name: "{group}\Secure LAN Chat"; Filename: "{app}\run.bat"
+Name: "{commondesktop}\Secure LAN Chat"; Filename: "{app}\run.bat"
+```
+
+3. Compile script để tạo file `.exe` installer
+
+**Phương pháp 2: Đóng gói thành Docker Container**
+
+Tạo file `Dockerfile`:
+
+```dockerfile
+FROM mcr.microsoft.com/dotnet/aspnet:8.0 AS base
+WORKDIR /app
+EXPOSE 80
+EXPOSE 443
+
+FROM mcr.microsoft.com/dotnet/sdk:8.0 AS build
+WORKDIR /src
+COPY ["src/Server/SecureLanChat.csproj", "src/Server/"]
+COPY ["src/Shared/", "src/Shared/"]
+RUN dotnet restore "src/Server/SecureLanChat.csproj"
+COPY . .
+WORKDIR "/src/src/Server"
+RUN dotnet build "SecureLanChat.csproj" -c Release -o /app/build
+
+FROM build AS publish
+RUN dotnet publish "SecureLanChat.csproj" -c Release -o /app/publish
+
+FROM base AS final
+WORKDIR /app
+COPY --from=publish /app/publish .
+ENTRYPOINT ["dotnet", "SecureLanChat.dll"]
+```
+
+Build và chạy Docker container:
+
+```bash
+docker build -t securelanchat .
+docker run -p 7000:443 -p 7001:80 securelanchat
+```
+
+#### 2.4.5 Tài liệu hướng dẫn
+
+**a. README.md:**
+Bao gồm:
+- Giới thiệu về hệ thống
+- Yêu cầu hệ thống
+- Hướng dẫn cài đặt nhanh
+- Hướng dẫn sử dụng cơ bản
+- Thông tin liên hệ
+
+**b. Hướng dẫn cài đặt chi tiết:**
+- Các bước cài đặt từng bước
+- Cấu hình database
+- Cấu hình mạng LAN
+- Xử lý lỗi thường gặp
+
+**c. Hướng dẫn sử dụng:**
+- Cách đăng ký/đăng nhập
+- Cách gửi tin nhắn
+- Các tính năng chính
+- FAQ (Câu hỏi thường gặp)
+
+#### 2.4.6 Quy trình đóng gói hoàn chỉnh
+
+**Bước 1: Build và publish ứng dụng**
+```bash
+cd src/Server
+dotnet publish -c Release -o ../../publish
+```
+
+**Bước 2: Copy frontend files**
+```bash
+xcopy /E /I src\Client\wwwroot publish\wwwroot
+```
+
+**Bước 3: Copy file cấu hình**
+```bash
+copy src\Server\appsettings.json publish\appsettings.json
+```
+
+**Bước 4: Tạo script chạy**
+- Tạo `run.bat`, `run.ps1`, `run.sh` như đã mô tả ở trên
+
+**Bước 5: Tạo tài liệu**
+- Cập nhật README.md
+- Tạo hướng dẫn cài đặt và sử dụng
+
+**Bước 6: Tạo installer (tùy chọn)**
+- Sử dụng Inno Setup hoặc NSIS để tạo file cài đặt
+- Hoặc đóng gói thành Docker image
+
+**Bước 7: Kiểm tra và test**
+- Test chạy ứng dụng từ thư mục publish
+- Kiểm tra tất cả các chức năng hoạt động đúng
+- Test trên các môi trường khác nhau (Windows, Linux)
+
+#### 2.4.7 Phân phối phần mềm
+
+Sau khi đóng gói, phần mềm có thể được phân phối qua:
+
+1. **File nén (ZIP/RAR)**: Đóng gói toàn bộ thư mục publish và các file cần thiết
+2. **Installer (EXE)**: File cài đặt tự động cho Windows
+3. **Docker Image**: Container image cho môi trường containerized
+4. **Git Repository**: Lưu trữ source code và hướng dẫn triển khai
+
+**Lưu ý khi phân phối:**
+- Đảm bảo file `appsettings.json` có cấu hình mẫu, không chứa thông tin nhạy cảm
+- Cung cấp hướng dẫn cấu hình connection string cho database
+- Hướng dẫn cấu hình HTTPS certificate nếu cần
+- Cung cấp thông tin về yêu cầu hệ thống tối thiểu
 
 ---
 
