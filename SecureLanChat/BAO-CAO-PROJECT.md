@@ -869,6 +869,74 @@ var user = await _context.Users
 - HTTPS only
 - Secure headers
 
+#### 2.3.3 Mã hóa đối xứng với thuật toán AES
+
+Ứng dụng sử dụng thuật toán mã hóa đối xứng với khóa định sẵn để đảm bảo tính bí mật dữ liệu truyền. Cụ thể, hệ thống sử dụng thuật toán **AES (Advanced Encryption Standard)** với độ dài khóa 128-bit để mã hóa nội dung tin nhắn.
+
+**Nguyên lý hoạt động:**
+
+Mã hóa đối xứng là phương pháp mã hóa sử dụng cùng một khóa cho cả quá trình mã hóa và giải mã. Trong hệ thống này, mỗi phiên làm việc (session) của người dùng được cấp phát một khóa AES duy nhất, được gọi là "session key". Khóa này được tạo tự động khi người dùng đăng nhập và được trao đổi an toàn giữa client và server thông qua mã hóa bất đối xứng RSA.
+
+**Quy trình mã hóa tin nhắn:**
+
+1. **Tạo khóa AES cho session**: Khi người dùng đăng nhập thành công, hệ thống tự động tạo một khóa AES 128-bit ngẫu nhiên cho phiên làm việc của người dùng đó.
+
+2. **Trao đổi khóa an toàn**: Khóa AES được mã hóa bằng khóa công khai RSA của người dùng và gửi đến client. Chỉ người dùng có khóa riêng tư RSA mới có thể giải mã để lấy khóa AES.
+
+3. **Mã hóa tin nhắn**: Khi người dùng gửi tin nhắn, hệ thống sử dụng khóa AES của người nhận để mã hóa nội dung tin nhắn. Mỗi tin nhắn được mã hóa với một Initialization Vector (IV) ngẫu nhiên để đảm bảo tính duy nhất và bảo mật.
+
+4. **Giải mã tin nhắn**: Khi nhận được tin nhắn đã mã hóa, người nhận sử dụng khóa AES của mình để giải mã và đọc nội dung tin nhắn.
+
+**Ưu điểm của mã hóa đối xứng AES:**
+
+- **Tốc độ nhanh**: AES là thuật toán mã hóa đối xứng nhanh, phù hợp cho việc mã hóa lượng dữ liệu lớn như tin nhắn chat.
+
+- **Bảo mật cao**: AES 128-bit được coi là an toàn và đủ mạnh cho hầu hết các ứng dụng hiện đại. Thuật toán này đã được NIST (Viện Tiêu chuẩn và Công nghệ Quốc gia Hoa Kỳ) chấp thuận và sử dụng rộng rãi.
+
+- **Hiệu quả**: So với mã hóa bất đối xứng (RSA), mã hóa đối xứng AES có tốc độ xử lý nhanh hơn nhiều lần, phù hợp cho việc mã hóa real-time.
+
+**Cơ chế bảo vệ khóa:**
+
+Mặc dù sử dụng khóa định sẵn cho mỗi session, hệ thống đảm bảo tính bảo mật thông qua các biện pháp sau:
+
+- **Khóa session duy nhất**: Mỗi phiên làm việc có một khóa AES riêng biệt, không được tái sử dụng giữa các session khác nhau.
+
+- **Thời gian hết hạn**: Khóa AES tự động hết hạn sau 24 giờ, buộc người dùng phải tạo khóa mới khi đăng nhập lại.
+
+- **Trao đổi khóa an toàn**: Khóa AES được trao đổi an toàn thông qua mã hóa RSA, đảm bảo chỉ người dùng hợp lệ mới có thể nhận được khóa.
+
+- **Lưu trữ an toàn**: Khóa AES được lưu trữ trong database dưới dạng đã mã hóa, không bao giờ lưu dưới dạng plain text.
+
+**Ví dụ mã hóa trong hệ thống:**
+
+```csharp
+// Mã hóa tin nhắn bằng AES
+public async Task<string> EncryptStringAsync(string plainText, string aesKey)
+{
+    using var aes = Aes.Create();
+    aes.Key = Convert.FromBase64String(aesKey);
+    aes.GenerateIV(); // Tạo IV ngẫu nhiên cho mỗi tin nhắn
+    
+    using var encryptor = aes.CreateEncryptor();
+    using var msEncrypt = new MemoryStream();
+    
+    // Ghi IV vào đầu stream
+    msEncrypt.Write(aes.IV, 0, aes.IV.Length);
+    
+    using (var csEncrypt = new CryptoStream(msEncrypt, encryptor, CryptoStreamMode.Write))
+    {
+        using (var swEncrypt = new StreamWriter(csEncrypt))
+        {
+            swEncrypt.Write(plainText);
+        }
+    }
+    
+    return Convert.ToBase64String(msEncrypt.ToArray());
+}
+```
+
+Nhờ sử dụng thuật toán mã hóa đối xứng AES với khóa định sẵn cho mỗi session, hệ thống đảm bảo tính bí mật và toàn vẹn của dữ liệu tin nhắn trong quá trình truyền tải, đồng thời duy trì hiệu suất cao cho việc giao tiếp real-time.
+
 ### 2.4 Đóng gói phần mềm
 
 **Các bước đóng gói:**
